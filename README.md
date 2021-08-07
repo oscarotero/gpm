@@ -43,6 +43,9 @@ gpm(packages, destination);
 ## Cli
 
 ```bash
+# Install
+deno install --unstable -A https://deno.land/x/gpm/mod.ts
+
 # Download necolas/normalize.css
 gpm necolas/normalize.css
 
