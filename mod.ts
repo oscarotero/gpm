@@ -72,7 +72,7 @@ if (import.meta.main) {
 }
 
 function parsePackage(pkg: string): Package {
-  const result = pkg.match(/^([\w/\-\.]+)(?:@([^/]+))?(\/.*)?$/);
+  const result = pkg.match(/^([\w/\-\.]+)(?:@([^/]*))?(\/.*)?$/);
   if (!result) {
     throw new Error(`Invalid package name: ${pkg}`);
   }
