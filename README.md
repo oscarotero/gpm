@@ -26,6 +26,13 @@ const packages = [
     name: "GoogleChrome/dialog-polyfill",
     version: "0.5",
   },
+
+  // And also the files/folders to copy
+  // (Uses package.json if it's not defined)
+  {
+    name: "oom-components/page-loader",
+    files: ["src"],
+  },
 ];
 
 const destination = "./vendors";

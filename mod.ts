@@ -20,7 +20,7 @@ interface Package {
 }
 
 export default async function main(
-  pkgs: Package[] | string[],
+  pkgs: (Package | string)[],
   dest = "./vendor",
 ) {
   for (let pkg of pkgs) {
@@ -118,16 +118,28 @@ async function install(
       continue;
     }
 
-    const fromFiles = files ? files : getNpmFiles(join(tmp, entry.name)) || [];
+    const fromFiles = files
+      ? files
+      : await getNpmFiles(join(tmp, entry.name)) || [];
+
+    if (!fromFiles.length) {
+      console.error(red("Error:"), `Set the files to copy for ${url}`);
+      break;
+    }
     const toFiles = stripBasePath(fromFiles.concat([]));
 
     await emptyDir(dest);
 
-    await Promise.all(fromFiles.map((file, index) => {
+    await Promise.all(fromFiles.map(async (file, index) => {
       const from = join(tmp, entry.name, file);
-      const to = join(dest, toFiles[index] || basename(from));
+      let to = join(dest, toFiles[index]);
+      const info = await Deno.stat(from);
 
-      console.log("  ", dim(to));
+      if (info.isFile && !toFiles[index]) {
+        to = join(to, basename(from));
+      }
+
+      console.log("  ", dim(info.isDirectory ? `${to}/*` : to));
       return copy(from, to, { overwrite: true });
     }));
 
@@ -138,10 +150,10 @@ async function install(
   return status.success;
 }
 
-function getNpmFiles(path: string): string[] | undefined {
+async function getNpmFiles(path: string): Promise<string[] | undefined> {
   const pkgFile = join(path, "package.json");
 
-  if (exists(pkgFile)) {
+  if (await exists(pkgFile)) {
     const pkg = JSON.parse(Deno.readTextFileSync(pkgFile));
 
     if (pkg.module) {
