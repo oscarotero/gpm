@@ -1,22 +1,24 @@
 import ghVersions from "./src/github.ts";
 import {
   basename,
-  copy,
   dim,
+  dirname,
   emptyDir,
   exists,
   extname,
   green,
   join,
+  JSZip,
   maxSatisfying,
   parse,
   red,
 } from "./deps.ts";
 
-interface Package {
+export interface Package {
   name: string;
   version?: string;
   files?: string[];
+  filter?: (path: string) => boolean;
 }
 
 export default async function main(
@@ -42,7 +44,7 @@ export default async function main(
       console.log(green("Install:"), `${pkg.name} ${dim(version)}`);
 
       const url = new URL(versions.get(version)!);
-      await install(url, join(dest, dir), pkg.files);
+      await install(url, join(dest, dir), pkg.files, pkg.filter);
     } else {
       console.error(
         red("Error:"),
@@ -88,115 +90,111 @@ async function install(
   url: URL,
   dest: string,
   files?: string[],
-): Promise<boolean> {
+  filter?: (path: string) => boolean,
+): Promise<void> {
   const res = await fetch(url);
-  const blog = await res.blob();
-  const data = new Uint8Array(await blog.arrayBuffer());
+  const blob = await res.blob();
+  const zip = new JSZip();
+  await zip.loadAsync(new Uint8Array(await blob.arrayBuffer()));
+  let root = zip;
 
-  const tmp = await Deno.makeTempDir();
-  const zip = join(tmp, "package.zip");
-  Deno.writeFile(zip, data);
-  const process = Deno.run({
-    cmd: Deno.build.os === "windows"
-      ? [
-        "PowerShell",
-        "Expand-Archive",
-        "-Path",
-        zip,
-        "-DestinationPath",
-        tmp,
-      ]
-      : ["unzip", zip, "-d", tmp],
-    stdout: "piped",
-    stderr: "piped",
+  // Get the first subfolder as root
+  for (const file of zip) {
+    if (file.dir) {
+      root = zip.folder(file.name);
+      break;
+    }
+  }
+
+  if (!files) {
+    files = await getNpmFiles(root);
+  }
+
+  await emptyDir(dest);
+
+  const zipFiles = root.filter((path: string, file) => {
+    if (file.dir) {
+      return false;
+    }
+
+    if (files && files.every((f) => f !== path && !path.startsWith(`${f}/`))) {
+      return false;
+    }
+
+    return filter ? filter(path) : true;
   });
 
-  const status = await process.status();
+  const rootPath = getRootPath(zipFiles.map((file) => file.name));
 
-  for await (const entry of Deno.readDir(tmp)) {
-    if (!entry.isDirectory) {
-      continue;
+  await Promise.all(zipFiles.map(async (file) => {
+    const path = join(dest, file.name.slice(rootPath.length));
+    const dir = dirname(path);
+
+    if (!exists(dir)) {
+      await Deno.mkdir(dir, { recursive: true });
     }
 
-    const fromFiles = files
-      ? files
-      : await getNpmFiles(join(tmp, entry.name)) || [];
-
-    if (!fromFiles.length) {
-      console.error(red("Error:"), `Set the files to copy for ${url}`);
-      break;
-    }
-    const toFiles = stripBasePath(fromFiles.concat([]));
-
-    await emptyDir(dest);
-
-    await Promise.all(fromFiles.map(async (file, index) => {
-      const from = join(tmp, entry.name, file);
-      let to = join(dest, toFiles[index]);
-      const info = await Deno.stat(from);
-
-      if (info.isFile && !toFiles[index]) {
-        to = join(to, basename(from));
-      }
-
-      console.log("  ", dim(info.isDirectory ? `${to}/*` : to));
-      return copy(from, to, { overwrite: true });
-    }));
-
-    break;
-  }
-
-  await Deno.remove(tmp, { recursive: true });
-  return status.success;
+    const content = await file.async("string");
+    return Deno.writeTextFile(path, content);
+  }));
 }
 
-async function getNpmFiles(path: string): Promise<string[] | undefined> {
-  const pkgFile = join(path, "package.json");
+async function getNpmFiles(root: JSZip): Promise<string[] | undefined> {
+  const pkgFile = await root.file("package.json");
 
-  if (await exists(pkgFile)) {
-    const pkg = JSON.parse(Deno.readTextFileSync(pkgFile));
+  if (!pkgFile) {
+    return;
+  }
 
-    if (pkg.module) {
-      return [pkg.module];
+  const pkg = JSON.parse(await pkgFile.async("string"));
+
+  if (pkg.module) {
+    return [pkg.module];
+  }
+
+  if (pkg.modules) {
+    return pkg.modules;
+  }
+
+  if (pkg.files) {
+    return pkg.files;
+  }
+
+  if (pkg.browser) {
+    return [pkg.browser];
+  }
+
+  if (pkg.main) {
+    if (!extname(pkg.main)) {
+      return [pkg.main + ".js"];
     }
 
-    if (pkg.modules) {
-      return pkg.modules;
-    }
-
-    if (pkg.files) {
-      return pkg.files;
-    }
-
-    if (pkg.browser) {
-      return [pkg.browser];
-    }
-
-    if (pkg.main) {
-      if (!extname(pkg.main)) {
-        return [pkg.main + ".js"];
-      }
-
-      return [pkg.main];
-    }
+    return [pkg.main];
   }
 }
 
-function stripBasePath(files: string[]): string[] {
-  while (true) {
-    const file = files[0];
-    const base = file.includes("/") ? file.split("/", 2).shift() + "/" : file;
+function getRootPath(files: string[]): string {
+  if (!files.length) {
+    return "";
+  }
 
-    if (!base) {
-      break;
-    }
+  if (files.length === 1) {
+    const base = basename(files[0]);
+    return files[0].slice(0, -base.length);
+  }
 
-    if (files.every((file) => file.startsWith(base))) {
-      files = files.map((file) => file.substr(base.length));
+  let result = "";
+  const parts = files[0].split("/", 2);
+
+  while (parts.length) {
+    const root = join(result, parts.shift()!);
+
+    if (files.every((file) => file.startsWith(root))) {
+      result = root;
     } else {
       break;
     }
   }
 
-  return files;
+  return result;
 }

@@ -27,11 +27,12 @@ const packages = [
     version: "0.5",
   },
 
-  // And also the files/folders to copy
-  // (Uses package.json if it's not defined)
+  // And also configure the files/folders to copy
+  // (it uses package.json as fallback)
   {
     name: "oom-components/page-loader",
     files: ["src"],
+    filter: (path) => path.endsWith(".js"),
   },
 ];
 
