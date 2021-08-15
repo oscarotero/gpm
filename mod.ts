@@ -110,6 +110,12 @@ async function install(
     files = await getNpmFiles(root);
   }
 
+  if (files) {
+    files = files.map((file) => {
+      return file.replace(/^(\/|\.\/)/, "");
+    });
+  }
+
   await emptyDir(dest);
 
   const zipFiles = root.filter((path: string, file) => {
