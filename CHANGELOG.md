@@ -7,7 +7,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.2.1] - 2021-08-18
+### Added
+- Support for urls, to download a file.
+- New option `dir`.
+
 ### Fixed
 - Support for files starting with `/` or `./`.
 
@@ -22,5 +26,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## 0.1.0 - 2021-08-07
 The first version.
 
-[Unreleased]: https://github.com/oscarotero/gpm/compare/v0.2.0...HEAD
+[0.2.1]: https://github.com/oscarotero/gpm/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/oscarotero/gpm/compare/v0.1.0...v0.2.0

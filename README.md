@@ -34,6 +34,9 @@ const packages = [
     files: ["src"],
     filter: (path) => path.endsWith(".js"),
   },
+
+  // Use full urls to download files directly
+  "https://unpkg.com/react@17.0.2/umd/react.production.min.js"
 ];
 
 const destination = "./vendors";

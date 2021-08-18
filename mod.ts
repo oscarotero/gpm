@@ -4,6 +4,7 @@ import {
   dim,
   dirname,
   emptyDir,
+  ensureDir,
   exists,
   extname,
   green,
@@ -19,6 +20,7 @@ export interface Package {
   version?: string;
   files?: string[];
   filter?: (path: string) => boolean;
+  dir?: string;
 }
 
 export default async function main(
@@ -28,6 +30,12 @@ export default async function main(
   for (let pkg of pkgs) {
     if (typeof pkg === "string") {
       pkg = { name: pkg };
+    }
+
+    // Is the url of a file
+    if (pkg.name.startsWith("https://")) {
+      await download(pkg, dest);
+      continue;
     }
 
     const dir = pkg.name.split("/").pop()!;
@@ -44,7 +52,7 @@ export default async function main(
       console.log(green("Install:"), `${pkg.name} ${dim(version)}`);
 
       const url = new URL(versions.get(version)!);
-      await install(url, join(dest, dir), pkg.files, pkg.filter);
+      await install(url, join(dest, pkg.dir || dir), pkg.files, pkg.filter);
     } else {
       console.error(
         red("Error:"),
@@ -177,6 +185,26 @@ async function getNpmFiles(root: JSZip): Promise<string[] | undefined> {
 
     return [pkg.main];
   }
+}
+
+async function download(pkg: Package, dest: string): Promise<void> {
+  const url = new URL(pkg.name);
+  const res = await fetch(url);
+  const blob = await res.blob();
+  const content = new Uint8Array(await blob.arrayBuffer());
+
+  dest = join(dest, pkg.dir || ".");
+
+  await ensureDir(dest);
+
+  if (extname(url.pathname) !== ".zip") {
+    await Deno.writeFile(join(dest, basename(url.pathname)), content);
+    return;
+  }
+
+  const zip = new JSZip();
+  await zip.loadAsync(content);
+  await zip.unzip(dest);
 }
 
 function getRootPath(files: string[]): string {
