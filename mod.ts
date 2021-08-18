@@ -197,6 +197,8 @@ async function download(pkg: Package, dest: string): Promise<void> {
 
   await ensureDir(dest);
 
+  console.log(green("Download:"), url);
+
   if (extname(url.pathname) !== ".zip") {
     await Deno.writeFile(join(dest, basename(url.pathname)), content);
     return;
