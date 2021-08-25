@@ -20,7 +20,7 @@ export interface Package {
   version?: string;
   files?: string[];
   filter?: (path: string) => boolean;
-  dir?: string;
+  dest?: string;
 }
 
 export default async function main(
@@ -34,7 +34,7 @@ export default async function main(
 
     // Is the url of a file
     if (pkg.name.startsWith("https://")) {
-      await download(pkg, dest);
+      await download(pkg, pkg.dest || dest);
       continue;
     }
 
@@ -52,7 +52,7 @@ export default async function main(
       console.log(green("Install:"), `${pkg.name} ${dim(version)}`);
 
       const url = new URL(versions.get(version)!);
-      await install(url, join(dest, pkg.dir || dir), pkg.files, pkg.filter);
+      await install(url, pkg.dest || join(dest, dir), pkg.files, pkg.filter);
     } else {
       console.error(
         red("Error:"),
@@ -144,7 +144,7 @@ async function install(
     const path = join(dest, file.name.slice(rootPath.length));
     const dir = dirname(path);
 
-    if (!exists(dir)) {
+    if (!await exists(dir)) {
       await Deno.mkdir(dir, { recursive: true });
     }
 
@@ -193,15 +193,15 @@ async function download(pkg: Package, dest: string): Promise<void> {
   const blob = await res.blob();
   const content = new Uint8Array(await blob.arrayBuffer());
 
-  dest = join(dest, pkg.dir || ".");
-
   await ensureDir(dest);
 
-  console.log(green("Download:"), url);
+  console.log(green("Download:"), url.href);
 
   if (extname(url.pathname) !== ".zip") {
-    await Deno.writeFile(join(dest, basename(url.pathname)), content);
-    return;
+    if (extname(url.pathname) === extname(dest)) {
+      return Deno.writeFile(dest, content);
+    }
+    return Deno.writeFile(join(dest, basename(url.pathname)), content);
   }
 
   const zip = new JSZip();

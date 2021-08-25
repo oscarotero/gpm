@@ -36,7 +36,13 @@ const packages = [
   },
 
   // Use full urls to download files directly
-  "https://unpkg.com/react@17.0.2/umd/react.production.min.js"
+  "https://unpkg.com/react@17.0.2/umd/react.production.min.js",
+
+  // Custom destination folder
+  {
+    name: "oom-components/carousel",
+    dest: "./vendors/components/carousel"
+  },
 ];
 
 const destination = "./vendors";
