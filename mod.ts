@@ -16,11 +16,18 @@ import {
 } from "./deps.ts";
 
 export interface Package {
+  /** Package name or file url */
   name: string;
+  /** Package version (GIT tag) */
   version?: string;
+  /** Files to download */
   files?: string[];
+  /** Function to filter the files to download */
   filter?: (path: string) => boolean;
+  /** Destination folder where the package files are downloaded */
   dest?: string;
+  /** Cache of the package in miliseconds (600000 by default) */
+  cache?: number;
 }
 
 export default async function main(
@@ -39,7 +46,7 @@ export default async function main(
     }
 
     const dir = pkg.name.split("/").pop()!;
-    const versions = await ghVersions(pkg.name);
+    const versions = await ghVersions(pkg.name, 100, pkg.cache ?? 600000);
 
     if (!versions) {
       console.error(red("Error:"), `${pkg.name} ${dim("not found")}`);

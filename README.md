@@ -41,7 +41,7 @@ const packages = [
   // Custom destination folder
   {
     name: "oom-components/carousel",
-    dest: "./vendors/components/carousel"
+    dest: "./vendors/components/carousel",
   },
 ];
 

@@ -1,3 +1,5 @@
+import { get, set } from "./cache.ts";
+
 interface GitHubTag {
   name: string;
   "zipball_url": string;
@@ -5,24 +7,30 @@ interface GitHubTag {
 
 export default async function github(
   name: string,
-  limit = 100,
+  limit: number,
+  cache: number,
 ): Promise<Map<string, string> | null> {
   const url = `https://api.github.com/repos/${name}/tags?per_page=${limit}`;
-  const res = await fetch(url);
+  let tags = get(url, cache) as GitHubTag[] | undefined;
 
-  if (res.status !== 200) {
-    if (res.headers.get("x-ratelimit-remaining") === "0") {
-      const reset = new Date(
-        parseInt(res.headers.get("x-ratelimit-reset")!) * 1000,
-      );
-      throw new Error(
-        `Rate limit reached for GitHub. Try again at ${reset.getHours()}:${reset.getMinutes()}`,
-      );
+  if (!tags) {
+    const res = await fetch(url);
+    console.log(`Fetching ${url}`);
+    if (res.status !== 200) {
+      if (res.headers.get("x-ratelimit-remaining") === "0") {
+        const reset = new Date(
+          parseInt(res.headers.get("x-ratelimit-reset")!) * 1000,
+        );
+        throw new Error(
+          `Rate limit reached for GitHub. Try again at ${reset.getHours()}:${reset.getMinutes()}`,
+        );
+      }
+      return null;
     }
-    return null;
-  }
 
-  const tags = await res.json();
+    tags = await res.json() as GitHubTag[];
+    set(url, tags);
+  }
 
   const result: Map<string, string> = new Map();
 
