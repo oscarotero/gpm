@@ -26,7 +26,7 @@ export interface Package {
   filter?: (path: string) => boolean;
   /** Destination folder where the package files are downloaded */
   dest?: string;
-  /** Cache of the package in miliseconds (600000 by default) */
+  /** Cache of the package in miliseconds. 600000 (10 minutes) by default */
   cache?: number;
 }
 
