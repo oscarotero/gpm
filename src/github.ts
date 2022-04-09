@@ -6,36 +6,44 @@ interface GitHubTag {
   "zipball_url": string;
 }
 
+interface Result {
+  versions: Map<string, string>;
+  cached: boolean;
+}
+
 export default async function github(
   name: string,
   limit: number,
   cache: number,
-): Promise<Map<string, string> | null> {
+): Promise<Result | null> {
   const url = `https://api.github.com/repos/${name}/tags?per_page=${limit}`;
-  let tags = get(url, cache) as GitHubTag[] | undefined;
+  const versions = get(url, cache) as Record<string, string> | undefined;
 
-  if (!tags) {
-    console.log(`Fetching available versions for ${name}`);
-
-    const res = await fetch(url);
-
-    if (res.status !== 200) {
-      if (res.headers.get("x-ratelimit-remaining") === "0") {
-        const reset = new Date(
-          parseInt(res.headers.get("x-ratelimit-reset")!) * 1000,
-        );
-        throw new Error(
-          `Rate limit reached for GitHub. Try again at ${reset.getHours()}:${reset.getMinutes()}`,
-        );
-      }
-      return null;
-    }
-
-    tags = await res.json() as GitHubTag[];
-    set(url, tags);
+  if (versions) {
+    return {
+      versions: new Map(Object.entries(versions)),
+      cached: true,
+    };
   }
 
-  const result: Map<string, string> = new Map();
+  console.log(`Fetching available versions for ${name}`);
+
+  const res = await fetch(url);
+
+  if (res.status !== 200) {
+    if (res.headers.get("x-ratelimit-remaining") === "0") {
+      const reset = new Date(
+        parseInt(res.headers.get("x-ratelimit-reset")!) * 1000,
+      );
+      throw new Error(
+        `Rate limit reached for GitHub. Try again at ${reset.getHours()}:${reset.getMinutes()}`,
+      );
+    }
+    return null;
+  }
+
+  const tags = await res.json() as GitHubTag[];
+  const result: Record<string, string> = {};
 
   tags.forEach((tag: GitHubTag) => {
     let version = valid(tag.name);
@@ -48,9 +56,14 @@ export default async function github(
     }
 
     if (version) {
-      result.set(version, tag.zipball_url);
+      result[version] = tag.zipball_url;
     }
   });
 
-  return result;
+  set(url, result);
+
+  return {
+    versions: new Map(Object.entries(result)),
+    cached: false,
+  };
 }

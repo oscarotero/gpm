@@ -5,7 +5,6 @@ import {
   dirname,
   emptyDir,
   ensureDir,
-  exists,
   extname,
   green,
   join,
@@ -34,6 +33,7 @@ export default async function main(
   pkgs: (Package | string)[],
   dest = "./vendor",
 ) {
+  install:
   for (let pkg of pkgs) {
     if (typeof pkg === "string") {
       pkg = { name: pkg };
@@ -46,20 +46,33 @@ export default async function main(
     }
 
     const dir = pkg.name.split("/").pop()!;
-    const versions = await ghVersions(pkg.name, 100, pkg.cache ?? 600000);
+    const result = await ghVersions(pkg.name, 100, pkg.cache ?? 600000);
 
-    if (!versions) {
+    if (!result) {
       console.error(red("Error:"), `${pkg.name} ${dim("not found")}`);
       continue;
     }
 
+    const { versions, cached } = result;
     const version = maxSatisfying([...versions.keys()], pkg.version || "*");
 
     if (version) {
-      console.log(green("Install:"), `${pkg.name} ${dim(version)}`);
+      const url = versions.get(version)!;
+      const destination = pkg.dest || join(dest, dir);
+      const files = pkg.files;
+      const filter = pkg.filter;
 
-      const url = new URL(versions.get(version)!);
-      await install(url, pkg.dest || join(dest, dir), pkg.files, pkg.filter);
+      if (cached) {
+        try {
+          await Deno.stat(destination);
+          continue install;
+        } catch {
+          // Ignore
+        }
+      }
+
+      console.log(green("Install:"), `${pkg.name} ${dim(version)}`);
+      await install(url, destination, files, filter);
     } else {
       console.error(
         red("Error:"),
@@ -102,7 +115,7 @@ function parsePackage(pkg: string): Package {
 }
 
 async function install(
-  url: URL,
+  url: string,
   dest: string,
   files?: string[],
   filter?: (path: string) => boolean,
@@ -151,8 +164,10 @@ async function install(
     const path = join(dest, file.name.slice(rootPath.length));
     const dir = dirname(path);
 
-    if (!await exists(dir)) {
+    try {
       await Deno.mkdir(dir, { recursive: true });
+    } catch {
+      // Directory already exists
     }
 
     const content = await file.async("string");
@@ -168,30 +183,29 @@ async function getNpmFiles(root: JSZip): Promise<string[] | undefined> {
   }
 
   const pkg = JSON.parse(await pkgFile.async("string"));
+  const files = new Set<string>();
+
+  if (pkg.style) {
+    files.add(pkg.style);
+  }
 
   if (pkg.module) {
-    return [pkg.module];
-  }
-
-  if (pkg.modules) {
-    return pkg.modules;
-  }
-
-  if (pkg.files) {
-    return pkg.files;
-  }
-
-  if (pkg.browser) {
-    return [pkg.browser];
-  }
-
-  if (pkg.main) {
+    files.add(pkg.module);
+  } else if (pkg.modules) {
+    pkg.modules.forEach((file: string) => files.add(file));
+  } else if (pkg.files) {
+    pkg.files.forEach((file: string) => files.add(file));
+  } else if (pkg.browser) {
+    files.add(pkg.browser);
+  } else if (pkg.main) {
     if (!extname(pkg.main)) {
       return [pkg.main + ".js"];
     }
 
-    return [pkg.main];
+    files.add(pkg.main);
   }
+
+  return [...files];
 }
 
 async function download(pkg: Package, dest: string): Promise<void> {

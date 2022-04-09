@@ -7,6 +7,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.5.0] - 2022-04-09
+### Added
+- Support for `style` key in package.json.
+
+### Changed
+- Do not download the packages if the `cache` has not expired and the dest folder exists.
+
 ## [0.4.1] - 2022-01-04
 ### Fixed
 - Ignored misformed versions.
@@ -47,6 +54,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [0.1.0] - 2021-08-07
 The first version.
 
+[0.5.0]: https://github.com/oscarotero/gpm/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/oscarotero/gpm/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/oscarotero/gpm/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/oscarotero/gpm/compare/v0.2.1...v0.3.0
